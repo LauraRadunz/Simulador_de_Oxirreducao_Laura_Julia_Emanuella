@@ -1,7 +1,6 @@
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.awt.geom.GeneralPath;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.TreeMap;
@@ -62,7 +61,7 @@ public class SimuladorSwing extends JFrame {
 
     public SimuladorSwing() {
         setTitle("Simulador de Oxirredução (Pilha de Daniell)");
-        setSize(1000, 720); // Aumentei um pouco para caber o desenho detalhado
+        setSize(1000, 780);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
         setLayout(new BorderLayout(10, 10));
@@ -126,14 +125,30 @@ public class SimuladorSwing extends JFrame {
         painelDesenho.setBackground(Color.WHITE);
         add(painelDesenho, BorderLayout.CENTER);
 
-        // 4. Baixo (Texto)
+        // 4. Baixo (Texto e Créditos)
+        JPanel panelSul = new JPanel(new BorderLayout());
+        
         areaResultado = new JTextArea(4, 40);
         areaResultado.setEditable(false);
-        areaResultado.setFont(new Font("Monospaced", Font.BOLD, 14));
+        
+        // Estilo
+        areaResultado.setFont(new Font("Monospaced", Font.BOLD, 20));
         areaResultado.setBackground(new Color(240, 240, 240));
+        areaResultado.setForeground(new Color(255, 20, 147)); // DeepPink (Rosa Choque)
+
         JScrollPane scrollRes = new JScrollPane(areaResultado);
         scrollRes.setBorder(BorderFactory.createTitledBorder("Dados da Reação"));
-        add(scrollRes, BorderLayout.SOUTH);
+        
+        panelSul.add(scrollRes, BorderLayout.CENTER);
+
+        // Label de Créditos
+        JLabel lblCreditos = new JLabel("Desenvolvido por: Laura Radünz Pedro, Julia Miranda Lima e Emanuella Bedim Zaniolo");
+        lblCreditos.setHorizontalAlignment(SwingConstants.RIGHT);
+        lblCreditos.setFont(new Font("SansSerif", Font.ITALIC, 15));
+        lblCreditos.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
+        panelSul.add(lblCreditos, BorderLayout.SOUTH);
+
+        add(panelSul, BorderLayout.SOUTH);
     }
 
     private void processarSelecao(int idSelecionado) {
@@ -172,19 +187,13 @@ public class SimuladorSwing extends JFrame {
         informacoesEspecies anodoOxida;
         informacoesEspecies catodoReduz;
 
-        // Determina quem é quem baseada na lógica de potencial (quem tem maior potencial reduz)
-        // Para simplificar a lógica visual, vamos garantir que a variável 'catodoReduz' seja a que tem maior potencial
-        double pot1 = primeiraEscolha.potencial();
-        double pot2 = segundaEscolha.potencial();
-        
-        // Identificar as formas reduzidas (metais) para comparar potenciais corretamente se o usuário clicou misturado
+        // Determina quem oxida e quem reduz (Comparando os metais)
         informacoesEspecies metal1 = primeiraEscolha.tipo().equals("reduzida") ? primeiraEscolha : bancoDeEspecies.get(getKeyByValue(primeiraEscolha.formaOposta()));
         informacoesEspecies metal2 = segundaEscolha.tipo().equals("reduzida") ? segundaEscolha : bancoDeEspecies.get(getKeyByValue(segundaEscolha.formaOposta()));
 
-        // Comparação de potenciais de redução
         if (metal1.potencial() > metal2.potencial()) {
-            catodoReduz = metal1; // Maior potencial reduz
-            anodoOxida = metal2;  // Menor potencial oxida
+            catodoReduz = metal1;
+            anodoOxida = metal2;
         } else {
             catodoReduz = metal2;
             anodoOxida = metal1;
@@ -199,11 +208,9 @@ public class SimuladorSwing extends JFrame {
         
         areaResultado.setText(sb.toString());
 
-        // Atualiza Desenho: Passamos o catodo primeiro pois na imagem de referência o Cátodo (Redução) está na ESQUERDA
-        painelDesenho.setDadosPilha(catodoReduz, anodoOxida, ddp);
+        painelDesenho.setDadosPilha(catodoReduz, anodoOxida);
     }
     
-    // Helper para achar a key do map reverso (simples para este caso pequeno)
     private int getKeyByValue(String forma) {
         for (Map.Entry<Integer, informacoesEspecies> entry : bancoDeEspecies.entrySet()) {
             if (entry.getValue().forma().equals(forma)) return entry.getKey();
@@ -223,17 +230,15 @@ public class SimuladorSwing extends JFrame {
         painelDesenho.resetar();
     }
 
-    // --- PAINEL DE DESENHO DA PILHA (REFORMULADO) ---
+    // --- PAINEL DE DESENHO DA PILHA ---
     class PainelPilha extends JPanel {
-        private informacoesEspecies catodoEsq; // Cátodo (Positivo, Redução) na Esquerda (Imagem)
-        private informacoesEspecies anodoDir;  // Ânodo (Negativo, Oxidação) na Direita (Imagem)
-        private double voltagem;
+        private informacoesEspecies catodoEsq; 
+        private informacoesEspecies anodoDir;  
         private boolean desenhar = false;
 
-        public void setDadosPilha(informacoesEspecies catodo, informacoesEspecies anodo, double voltagem) {
+        public void setDadosPilha(informacoesEspecies catodo, informacoesEspecies anodo) {
             this.catodoEsq = catodo;
             this.anodoDir = anodo;
-            this.voltagem = voltagem;
             this.desenhar = true;
             repaint();
         }
@@ -243,24 +248,26 @@ public class SimuladorSwing extends JFrame {
             repaint();
         }
         
-        // Helper para cor do metal
         private Color getCorMetal(String simbolo) {
             return switch (simbolo) {
-                case "Cu" -> new Color(184, 115, 51);  // Cobre (Laranja/Marrom)
-                case "Zn" -> new Color(140, 140, 150); // Zinco (Cinza azulado)
-                case "Au" -> new Color(255, 215, 0);   // Ouro (Amarelo)
-                case "Ag" -> new Color(220, 220, 220); // Prata (Cinza claro)
-                case "Mg" -> new Color(200, 200, 200); // Magnésio (Branco metálico)
-                case "Fe" -> new Color(100, 100, 100); // Ferro (Cinza escuro)
+                case "Cu" -> new Color(184, 115, 51);  
+                case "Zn" -> new Color(140, 140, 150); 
+                case "Au" -> new Color(255, 215, 0);   
+                case "Ag" -> new Color(220, 220, 220); 
+                case "Mg" -> new Color(200, 200, 200); 
+                case "Fe" -> new Color(100, 100, 100); 
+                case "Li" -> new Color(180, 180, 180); 
+                case "Al" -> new Color(190, 190, 190); 
+                case "Ni" -> new Color(150, 150, 150); 
+                case "Pb" -> new Color(100, 100, 110); 
                 default -> Color.GRAY;
             };
         }
         
-        // Helper para cor da solução
         private Color getCorSolucao(String simbolo) {
-             if (simbolo.equals("Cu")) return new Color(135, 206, 250); // Azulado
-             if (simbolo.equals("Ni")) return new Color(144, 238, 144); // Esverdeado
-             return new Color(225, 245, 255); // Padrão transparente/azulado
+             if (simbolo.equals("Cu")) return new Color(135, 206, 250); 
+             if (simbolo.equals("Ni")) return new Color(144, 238, 144); 
+             return new Color(225, 245, 255); 
         }
 
         @Override
@@ -280,51 +287,41 @@ public class SimuladorSwing extends JFrame {
 
             int w = getWidth();
             int h = getHeight();
-            int centroY = h / 2 + 20;
+            int centroY = h / 2 + 10;
             int bequerW = 180;
             int bequerH = 220;
             int offsetEsq = w/2 - 250; 
             int offsetDir = w/2 + 70;
 
             // --- 1. Copos (Béqueres) e Solução ---
-            
-            // Béquer Esquerdo (Cátodo/Redução)
             drawBequer(g2, offsetEsq, centroY - 100, bequerW, bequerH, getCorSolucao(catodoEsq.getSimbolo()));
-            // Béquer Direito (Ânodo/Oxidação)
             drawBequer(g2, offsetDir, centroY - 100, bequerW, bequerH, getCorSolucao(anodoDir.getSimbolo()));
 
             // --- 2. Eletrodos ---
-            
-            // Eletrodo Esquerdo (Metal do Cátodo)
             g2.setColor(getCorMetal(catodoEsq.getSimbolo()));
             g2.fillRect(offsetEsq + 60, centroY - 80, 60, 180);
             g2.setColor(Color.BLACK);
             g2.setStroke(new BasicStroke(2));
             g2.drawRect(offsetEsq + 60, centroY - 80, 60, 180);
-            // Label Metal
             g2.setColor(Color.WHITE);
             g2.setFont(new Font("Arial", Font.BOLD, 24));
             g2.drawString(catodoEsq.getSimbolo(), offsetEsq + 75, centroY + 20);
 
-            // Eletrodo Direito (Metal do Ânodo)
             g2.setColor(getCorMetal(anodoDir.getSimbolo()));
-            g2.fillRect(offsetDir + 60, centroY - 80, 60, 180); // Um pouco corroído visualmente? (opcional)
+            g2.fillRect(offsetDir + 60, centroY - 80, 60, 180); 
             g2.setColor(Color.BLACK);
             g2.drawRect(offsetDir + 60, centroY - 80, 60, 180);
-            // Label Metal
             g2.setColor(Color.WHITE);
             g2.drawString(anodoDir.getSimbolo(), offsetDir + 75, centroY + 20);
 
             // --- 3. Ponte Salina ---
-            g2.setColor(new Color(230, 230, 220)); // Cor creme/vidro
+            g2.setColor(new Color(230, 230, 220)); 
             g2.setStroke(new BasicStroke(25, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-            g2.drawArc(w/2 - 90, centroY - 60, 180, 150, 0, 180); // Arco
-            // Borda Ponte
+            g2.drawArc(w/2 - 90, centroY - 60, 180, 150, 0, 180); 
             g2.setColor(Color.BLACK);
             g2.setStroke(new BasicStroke(2));
-            g2.drawArc(w/2 - 102, centroY - 60, 204, 170, 0, 180); // Arco externo
-            g2.drawArc(w/2 - 78, centroY - 60, 156, 130, 0, 180);  // Arco interno
-            // "Algodão" nas pontas
+            g2.drawArc(w/2 - 102, centroY - 60, 204, 170, 0, 180); 
+            g2.drawArc(w/2 - 78, centroY - 60, 156, 130, 0, 180);  
             g2.setColor(Color.WHITE);
             g2.fillOval(w/2 - 102, centroY + 15, 24, 24);
             g2.fillOval(w/2 + 78, centroY + 15, 24, 24);
@@ -337,6 +334,9 @@ public class SimuladorSwing extends JFrame {
             g2.setStroke(new BasicStroke(3));
             
             // Fio Esquerda
+            int lampX = w/2 - 25;
+            int lampY = centroY - 230;
+
             g2.drawLine(offsetEsq + 90, centroY - 80, offsetEsq + 90, centroY - 180); 
             g2.drawLine(offsetEsq + 90, centroY - 180, w/2 - 30, centroY - 180); 
             
@@ -345,27 +345,21 @@ public class SimuladorSwing extends JFrame {
             g2.drawLine(offsetDir + 90, centroY - 180, w/2 + 30, centroY - 180);
 
             // LÂMPADA ACESA
-            int lampX = w/2 - 25;
-            int lampY = centroY - 230;
             g2.setColor(Color.YELLOW);
-            g2.fillOval(lampX, lampY, 50, 50); // Bulbo
+            g2.fillOval(lampX, lampY, 50, 50); 
             g2.setColor(Color.ORANGE); 
             g2.setStroke(new BasicStroke(2));
-            g2.drawOval(lampX, lampY, 50, 50); // Contorno
-            // Brilho (Raios)
+            g2.drawOval(lampX, lampY, 50, 50); 
             g2.setColor(Color.ORANGE);
             g2.drawLine(w/2, lampY - 10, w/2, lampY - 25);
             g2.drawLine(w/2 - 30, lampY + 10, w/2 - 45, lampY);
             g2.drawLine(w/2 + 30, lampY + 10, w/2 + 45, lampY);
-            // Base da lampada
             g2.setColor(Color.DARK_GRAY);
             g2.fillRect(lampX + 10, lampY + 48, 30, 20);
             g2.setColor(Color.BLACK);
             g2.drawString("lâmpada acesa", w/2 - 45, lampY - 30);
 
             // --- 5. Informações e Elétrons ---
-            
-            // Sentido dos Elétrons (Do Anodo/Direita para o Catodo/Esquerda)
             g2.setColor(Color.BLACK);
             g2.setFont(new Font("Arial", Font.PLAIN, 14));
             // Seta Esquerda
@@ -375,10 +369,9 @@ public class SimuladorSwing extends JFrame {
             g2.drawString("e-", offsetDir + 5, centroY - 190);
             drawArrow(g2, offsetDir + 80, centroY - 180, offsetDir + 30, centroY - 180);
 
-            // Textos Descritivos (Baseado na imagem)
+            // Textos Descritivos
             g2.setFont(new Font("Arial", Font.BOLD, 14));
-            
-            // LADO ESQUERDO (CATODO)
+            // LADO ESQUERDO
             g2.setColor(Color.BLACK);
             String txtMetEsq = catodoEsq.forma() + " metálico";
             g2.drawString(txtMetEsq, offsetEsq + 30, centroY - 260);
@@ -388,8 +381,7 @@ public class SimuladorSwing extends JFrame {
             g2.drawString("(polo positivo", offsetEsq + 55, centroY - 220);
             g2.drawString("onde ocorre a", offsetEsq + 55, centroY - 205);
             g2.drawString("redução)", offsetEsq + 70, centroY - 190);
-
-            // LADO DIREITO (ANODO)
+            // LADO DIREITO
             g2.setFont(new Font("Arial", Font.BOLD, 14));
             String txtMetDir = anodoDir.forma() + " metálico";
             g2.drawString(txtMetDir, offsetDir + 30, centroY - 260);
@@ -400,13 +392,11 @@ public class SimuladorSwing extends JFrame {
             g2.drawString("onde ocorre a", offsetDir + 55, centroY - 205);
             g2.drawString("oxidação)", offsetDir + 70, centroY - 190);
 
-            // ÍONS NA SOLUÇÃO
+            // ÍONS
             g2.setFont(new Font("Arial", Font.BOLD, 16));
             g2.setColor(Color.DARK_GRAY);
-            // Esq
             g2.drawString(catodoEsq.getSimboloIon(), offsetEsq + 20, centroY + 80);
             g2.drawString("SO4 2-", offsetEsq + 110, centroY + 60);
-            // Dir
             g2.drawString(anodoDir.getSimboloIon(), offsetDir + 120, centroY + 100);
             g2.drawString("SO4 2-", offsetDir + 30, centroY + 80);
         }
@@ -418,21 +408,25 @@ public class SimuladorSwing extends JFrame {
             // Liquido
             g2.setColor(corLiq);
             g2.fillRoundRect(x + 5, y + 80, w - 10, h - 85, 25, 25);
-            g2.fillRect(x + 5, y + 80, w - 10, 20); // Topo reto do liquido
+            g2.fillRect(x + 5, y + 80, w - 10, 20); 
             g2.setColor(corLiq.darker());
-            g2.drawOval(x + 5, y + 70, w - 10, 20); // Superficie do liquido
+            g2.drawOval(x + 5, y + 70, w - 10, 20); 
             
             // Contorno Bequer
             g2.setColor(Color.BLACK);
             g2.setStroke(new BasicStroke(1));
             g2.drawRoundRect(x, y, w, h, 30, 30);
-            g2.drawOval(x, y - 10, w, 20); // Boca do bequer
+            g2.drawOval(x, y - 10, w, 20); 
         }
 
         private void drawArrow(Graphics2D g2, int x1, int y1, int x2, int y2) {
             g2.drawLine(x1, y1, x2, y2);
             int arrowSize = 6;
-            g2.fillPolygon(new int[]{x2, x2 + arrowSize, x2 + arrowSize}, new int[]{y2, y2 - arrowSize, y2 + arrowSize}, 3);
+            if (x1 < x2) { 
+                 g2.fillPolygon(new int[]{x2, x2 - arrowSize, x2 - arrowSize}, new int[]{y2, y2 - arrowSize, y2 + arrowSize}, 3);
+            } else { 
+                 g2.fillPolygon(new int[]{x2, x2 + arrowSize, x2 + arrowSize}, new int[]{y2, y2 - arrowSize, y2 + arrowSize}, 3);
+            }
         }
     }
 
